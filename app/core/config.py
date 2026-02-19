@@ -1,0 +1,11 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Settings:
+    SQLITE_DB_PATH: str = os.getenv("SQLITE_DB_PATH", "data/app.db")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+settings = Settings()
+
