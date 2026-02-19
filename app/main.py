@@ -1,12 +1,10 @@
 from fastapi import FastAPI
+from app.api.routes import router as api_router
 
-app = FastAPI(
-    title="Document Intelligence API",
-    description="Backend-only Document Intelligence system using Hybrid Retrieval (FAISS + BM25) and LLM.",
-    version="1.0.0",
-)
+app = FastAPI()
+
+app.include_router(api_router)
 
 @app.get("/health")
-async def health_check():
+def health():
     return {"status": "ok"}
-from app.core import config
