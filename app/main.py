@@ -1,10 +1,23 @@
 from fastapi import FastAPI
+
 from app.api.routes import router as api_router
+from app.persistence.database import Base, engine
 
-app = FastAPI()
 
-app.include_router(api_router)
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Intelligent Document Query System",
+        description="Evidence-driven document intelligence backend",
+        version="1.0.0",
+    )
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+    # Initialize database tables
+    Base.metadata.create_all(bind=engine)
+
+    # Register API routes
+    app.include_router(api_router)
+
+    return app
+
+
+app = create_app()
