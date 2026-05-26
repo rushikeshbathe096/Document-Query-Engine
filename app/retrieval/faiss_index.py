@@ -67,6 +67,10 @@ class FAISSIndex:
         instance.chunk_ids = chunk_ids
         return instance
 
+    @staticmethod
+    def index_name_for_document(document_id: int) -> str:
+        return f"doc_{document_id}"
+
     def rebuild(self, chunks: List[Dict[str, Any]], embeddings: np.ndarray):
         """
         Clears the current index and rebuilds it from the provided chunks.

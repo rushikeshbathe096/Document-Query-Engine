@@ -10,6 +10,16 @@ class Document(Base):
     hash = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class Chunk(Base):
+    __tablename__ = "chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    chunk_id = Column(String, index=True, nullable=False)
+    text = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=False)
+    position = Column(Integer, nullable=False)
+
 class Query(Base):
     __tablename__ = "queries"
 

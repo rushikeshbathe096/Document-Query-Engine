@@ -1,38 +1,29 @@
 import hashlib
-import shutil
+import uuid
 from pathlib import Path
 from fastapi import UploadFile
 
 UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".docx", ".txt"}
+
+def _safe_filename(filename: str) -> str:
+    name = Path(filename).name
+    suffix = Path(name).suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise ValueError(f"File type '{suffix}' not allowed. Allowed: {ALLOWED_EXTENSIONS}")
+    return name
+
 def save_uploaded_file(file: UploadFile) -> tuple[str, str, str]:
-    """
-    Saves uploaded file to disk and computes SHA256 hash.
-    Returns (filename, file_hash, file_path).
-    """
-    # Create a temporary path or read into memory to hash? 
-    # For large files, reading chunk by chunk is better.
-    # We will write to a temp location first or directly to destination if we knew the hash?
-    # Since we need the hash to maybe name it or just to return it, we read it.
-    
-    # We'll save to a temp path first, compute hash, then move/rename if needed
-    # or just save to the target filename. 
-    # User requirement: "Save uploaded files under data/uploads/"
-    # User requirement: "Compute SHA256 hash"
-    
-    file_path = UPLOAD_DIR / file.filename
-    
-    # We assume filename availability or overwrite.
-    # Computing hash while writing.
+    safe_name = _safe_filename(file.filename)
+    unique_name = f"{uuid.uuid4().hex}_{safe_name}"
+    file_path = UPLOAD_DIR / unique_name
+
     sha256_hash = hashlib.sha256()
-    
     with open(file_path, "wb") as buffer:
         while content := file.file.read(4096):
             buffer.write(content)
             sha256_hash.update(content)
-            
-    # Reset file cursor just in case, though we saved it already.
-    file.file.seek(0)
-    
-    return file.filename, sha256_hash.hexdigest(), str(file_path)
+
+    return safe_name, sha256_hash.hexdigest(), str(file_path)

@@ -21,20 +21,18 @@ def score_confidence(
     retrieval_score = retrieval_metrics.get("normalized_score", 0.0)
     retrieval_score = max(0.0, min(1.0, retrieval_score))
 
-    # Evidence agreement: proportion of cited chunks that actually exist
+    # Evidence agreement: how well-cited the answer is
     citations = answer_payload.get("citations", [])
-    total_citations = len(citations)
+    answer = answer_payload.get("answer", "")
 
-    if total_citations == 0:
+    if not citations or not answer:
         evidence_agreement = 0.0
     else:
-        evidence_agreement = 1.0
+        answer_word_count = len(answer.split())
+        # More citations per word of answer → higher confidence
+        citation_density = len(citations) / max(answer_word_count, 1)
+        evidence_agreement = min(1.0, citation_density * 5)
 
-    # Weighted combination
-    # Verification already passed, so it acts as a gate, not a weight
-    confidence = (
-        0.5 * retrieval_score +
-        0.5 * evidence_agreement
-    )
+    confidence = 0.5 * retrieval_score + 0.5 * evidence_agreement
 
     return round(max(0.0, min(1.0, confidence)), 3)

@@ -4,8 +4,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
-    SQLITE_DB_PATH: str = os.getenv("SQLITE_DB_PATH", "data/app.db")
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY")
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        f"sqlite:///{os.getenv('SQLITE_DB_PATH', 'data/app.db')}"
+    )
 
 settings = Settings()

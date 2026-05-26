@@ -1,26 +1,12 @@
-import os
 import json
+import logging
 from typing import Dict, Any
-from google import genai
-from dotenv import load_dotenv
+from app.llm.groq import generate_with_groq
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 class QueryAnalyzer:
-    """
-    Uses Gemini LLM to analyze the intent and structure of a user query.
-    Outputs STRICT JSON describing query intent only.
-    """
-
-    def __init__(self, model: str = "gemini-2.5-flash"):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY not set")
-
-        self.client = genai.Client(api_key=api_key)
-        self.model = model
-
     def analyze_query(self, query: str) -> Dict[str, Any]:
         if not query or not query.strip():
             return {
@@ -35,7 +21,7 @@ You are a query analysis module.
 Analyze the following user query and return STRICT JSON ONLY.
 
 Allowed query_type values:
-["definition", "procedural", "conceptual", "comparison", "lookup", "unknown"]
+["definition", "procedural", "conceptual", "comparison", "lookup", "factual", "summarization", "unknown"]
 
 Return exactly this JSON format:
 {{
@@ -54,14 +40,8 @@ User query:
 """
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-            )
+            text = generate_with_groq(prompt)
 
-            text = response.text.strip()
-
-            # Extract JSON safely
             start = text.find("{")
             end = text.rfind("}")
 
@@ -69,16 +49,12 @@ User query:
                 raise ValueError("No JSON object found")
 
             json_text = text[start:end + 1]
-            parsed_json = json.loads(json_text)
-
-            return parsed_json
+            return json.loads(json_text)
 
         except Exception as e:
-            print("QueryAnalyzer error:", e)
+            logger.warning("QueryAnalyzer error: %s", e)
             return {
                 "query_type": "unknown",
                 "keywords": [],
                 "expected_sections": []
             }
-
-

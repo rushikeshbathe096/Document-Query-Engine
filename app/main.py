@@ -1,7 +1,14 @@
+import logging
 from fastapi import FastAPI
 
 from app.api.routes import router as api_router
 from app.persistence.database import Base, engine
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 
 def create_app() -> FastAPI:
@@ -11,10 +18,8 @@ def create_app() -> FastAPI:
         version="1.0.0",
     )
 
-    # Initialize database tables
     Base.metadata.create_all(bind=engine)
 
-    # Register API routes
     app.include_router(api_router)
 
     return app
