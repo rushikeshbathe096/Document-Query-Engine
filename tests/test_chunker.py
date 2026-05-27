@@ -12,7 +12,7 @@ def get_test_chunker():
         tokenizer=DummyTokenizer(),
         target_tokens=10,
         max_tokens=15,
-        overlap_sentences=2,
+        overlap_tokens=2,
     )
 
 
@@ -51,17 +51,15 @@ def test_token_limits_respected():
 
 def test_overlap_semantics():
     chunker = get_test_chunker()
-    text = "A one. B two. C three. D four. E five. F six."
+    text = "One. Two. Three. Four. Five. Six."
 
     chunks = chunker.chunk_page(1, text)
 
     if len(chunks) > 1:
-        first = chunks[0]["text"]
-        second = chunks[1]["text"]
+        first_words = set(chunks[0]["text"].replace(".", "").split())
+        second_words = set(chunks[1]["text"].replace(".", "").split())
 
-        overlap = first.split(".")[-3:-1]
-        for part in overlap:
-            assert part.strip() in second
+        assert first_words & second_words
 
 
 def test_output_schema():

@@ -34,12 +34,13 @@ class Reranker:
             k_score = res.get("norm_keyword_score", 0.0)
             s_score = res.get("norm_semantic_score", 0.0)
             
-            # Weighted combination
+            # This weighted combination is the single authoritative ranking score.
             combined_score = (self.alpha * s_score) + ((1 - self.alpha) * k_score)
             
             if combined_score >= self.threshold:
                 final_scores.append({
                     "chunk_id": res["chunk_id"],
+                    "combined_score": combined_score,
                     "score": combined_score,
                     # Provenance for debugging/transparency
                     "metadata": {
@@ -48,7 +49,7 @@ class Reranker:
                     }
                 })
         
-        # Sort by combined score descending
-        final_scores.sort(key=lambda x: x["score"], reverse=True)
+        # Sort by the authoritative combined score and preserve it unchanged.
+        final_scores.sort(key=lambda x: x["combined_score"], reverse=True)
         
         return final_scores[:self.top_k]

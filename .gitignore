@@ -2,4 +2,7 @@ venv/
 __pycache__/
 *.pyc
 data/app.db
+data/*.db
+data/uploads/
+data/indexes/
 .env

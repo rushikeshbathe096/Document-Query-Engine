@@ -1,4 +1,7 @@
+import logging
 from typing import Dict, List
+
+logger = logging.getLogger(__name__)
 
 STOPWORDS = {
     "the", "is", "are", "was", "were", "a", "an", "to", "of",
@@ -52,27 +55,47 @@ def verify_answer(
                 "reason": f"Citation '{cid}' does not exist in provided evidence."
             }
 
+    answer_lower = answer.lower().strip()
+    evidence_texts = [evidence_map[cid].lower() for cid in citations]
+    exact_match = any(answer_lower and answer_lower in evidence_text for evidence_text in evidence_texts)
+    logger.debug("Verification exact match: %s", exact_match)
+
+    if exact_match:
+        logger.debug("Verification overlap ratio: %s", 1.0)
+        logger.debug("Verification result: %s", True)
+        return {
+            "verified": True,
+            "reason": "Exact answer found in evidence"
+        }
+
     answer_tokens = _tokenize(answer)
 
     if not answer_tokens:
+        logger.debug("Verification overlap ratio: %s", 0.0)
+        logger.debug("Verification result: %s", False)
         return {
             "verified": False,
             "reason": "Answer contains no verifiable content."
         }
 
+    best_overlap_ratio = 0.0
     for cid in citations:
         evidence_tokens = _tokenize(evidence_map[cid])
 
         overlap = answer_tokens & evidence_tokens
         overlap_ratio = len(overlap) / len(answer_tokens)
+        best_overlap_ratio = max(best_overlap_ratio, overlap_ratio)
 
-        # Require at least 50% of meaningful answer tokens
-        if overlap_ratio >= 0.5:
+        if overlap_ratio >= 0.20:
+            logger.debug("Verification overlap ratio: %s", overlap_ratio)
+            logger.debug("Verification result: %s", True)
             return {
                 "verified": True,
                 "reason": "Answer is sufficiently supported by cited evidence."
             }
 
+    logger.debug("Verification overlap ratio: %s", best_overlap_ratio)
+    logger.debug("Verification result: %s", False)
     return {
         "verified": False,
         "reason": "Answer is not sufficiently supported by cited evidence."

@@ -6,13 +6,25 @@ from fastapi import UploadFile
 UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".docx", ".txt"}
+ALLOWED_EXTENSIONS = {".pdf", ".txt"}
+
+
+class InvalidFilenameError(ValueError):
+    pass
+
+
+class UnsupportedFileTypeError(ValueError):
+    pass
 
 def _safe_filename(filename: str) -> str:
+    if not filename:
+        raise InvalidFilenameError("Filename is required.")
     name = Path(filename).name
     suffix = Path(name).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
-        raise ValueError(f"File type '{suffix}' not allowed. Allowed: {ALLOWED_EXTENSIONS}")
+        raise UnsupportedFileTypeError(
+            f"File type '{suffix}' not allowed. Allowed: {ALLOWED_EXTENSIONS}"
+        )
     return name
 
 def save_uploaded_file(file: UploadFile) -> tuple[str, str, str]:

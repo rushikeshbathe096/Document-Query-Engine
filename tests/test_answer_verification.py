@@ -19,6 +19,25 @@ def test_verification_passes_with_valid_evidence():
     assert result["verified"] is True
 
 
+def test_verification_passes_on_exact_match_short_answer():
+    answer = {
+        "answer": "Rushikesh Bathe",
+        "citations": ["c1"],
+    }
+
+    evidence = [
+        {
+            "chunk_id": "c1",
+            "text": "Candidate Name: Rushikesh Bathe"
+        }
+    ]
+
+    result = verify_answer(answer, evidence)
+
+    assert result["verified"] is True
+    assert result["reason"] == "Exact answer found in evidence"
+
+
 def test_verification_fails_without_citations():
     answer = {
         "answer": "Some answer",
@@ -51,7 +70,7 @@ def test_verification_fails_on_invalid_citation():
 
 def test_verification_fails_when_answer_not_supported():
     answer = {
-        "answer": "This experiment uses neural networks.",
+        "answer": "Graph database optimization.",
         "citations": ["c1"],
     }
 

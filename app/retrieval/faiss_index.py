@@ -67,6 +67,16 @@ class FAISSIndex:
         instance.chunk_ids = chunk_ids
         return instance
 
+    @classmethod
+    def delete(cls, name: str = "semantic_index") -> None:
+        index_path = INDEX_DIR / f"{name}.faiss"
+        mapping_path = INDEX_DIR / f"{name}.json"
+
+        if index_path.exists():
+            index_path.unlink()
+        if mapping_path.exists():
+            mapping_path.unlink()
+
     @staticmethod
     def index_name_for_document(document_id: int) -> str:
         return f"doc_{document_id}"

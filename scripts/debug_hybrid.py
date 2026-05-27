@@ -1,4 +1,4 @@
-from app.retrieval.hybrid_search import HybridSearch
+from app.retrieval.hybrid_search import merge_results
 
 # Fake BM25 output (higher = better)
 bm25_results = [
@@ -14,9 +14,7 @@ faiss_results = [
     {"chunk_id": "c2", "score": 1.2},
 ]
 
-hybrid = HybridSearch()
-
-results = hybrid.merge_results(
+results = merge_results(
     keyword_results=bm25_results,
     semantic_results=faiss_results
 )

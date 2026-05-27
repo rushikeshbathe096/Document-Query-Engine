@@ -7,13 +7,17 @@ import logging
 from app.persistence.database import SessionLocal
 from app.persistence import repository
 
-from app.ingestion.uploader import save_uploaded_file
-from app.ingestion.parser import parse_document
+from app.ingestion.uploader import (
+    save_uploaded_file,
+    InvalidFilenameError,
+    UnsupportedFileTypeError,
+)
+from app.ingestion.parser import parse_document, UnsupportedDocumentTypeError
 from app.ingestion.chunker import get_chunker
 
 from app.retrieval.embeddings import Embedder
 from app.retrieval.faiss_index import FAISSIndex
-from app.retrieval.hybrid_search import hybrid_search
+from app.retrieval.hybrid_search import hybrid_search, debug_retrieval
 
 from app.reasoning.query_analyzer import QueryAnalyzer
 from app.reasoning.router import route_query
@@ -38,11 +42,18 @@ def get_db():
 
 # Upload Endpoint — pre-processes document
 @router.post("/documents/upload")
-async def upload_document(
+def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    filename, file_hash, file_path = save_uploaded_file(file)
+    try:
+        filename, file_hash, file_path = save_uploaded_file(file)
+    except InvalidFilenameError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except UnsupportedFileTypeError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to read uploaded file.")
 
     existing_doc = repository.get_document_by_hash(db, file_hash)
     if existing_doc:
@@ -51,13 +62,19 @@ async def upload_document(
     new_doc = repository.create_document(db, filename, file_hash)
 
     try:
-        pages = parse_document(file_path)
+        try:
+            pages = parse_document(file_path)
+        except UnsupportedDocumentTypeError as e:
+            raise HTTPException(status_code=415, detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=422, detail="Document could not be parsed.")
+
         if not pages:
-            raise ValueError("No pages extracted from document")
+            raise HTTPException(status_code=422, detail="No pages extracted from document.")
 
         chunks = chunker.chunk_document(pages)
         if not chunks:
-            raise ValueError("No chunks generated from document")
+            raise HTTPException(status_code=424, detail="No chunks generated from document.")
 
         embedder = Embedder()
         index_name = FAISSIndex.index_name_for_document(new_doc.id)
@@ -73,10 +90,13 @@ async def upload_document(
         file_path_obj = Path(file_path)
         if file_path_obj.exists():
             file_path_obj.unlink()
+        FAISSIndex.delete(FAISSIndex.index_name_for_document(new_doc.id))
         repository.delete_chunks_by_document(db, new_doc.id)
         db.delete(new_doc)
         db.commit()
-        raise HTTPException(status_code=500, detail=f"Document processing failed: {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="Document processing failed.")
 
     return {"document_id": new_doc.id, "status": "created"}
 
@@ -103,6 +123,9 @@ def query_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    if not payload.query or not payload.query.strip():
+        raise HTTPException(status_code=400, detail="Query must not be empty.")
+
     query_row = repository.create_query(db, document_id, payload.query)
 
     query_analysis = query_analyzer.analyze_query(payload.query)
@@ -114,6 +137,7 @@ def query_document(
         bm25_k=route["bm25_k"],
         faiss_k=route["faiss_k"],
         db=db,
+        query_type=query_analysis.get("query_type", "unknown"),
     )
 
     evidence_chunks = retrieval.get("chunks", [])
@@ -121,7 +145,7 @@ def query_document(
 
     if not evidence_chunks:
         repository.create_answer(db, query_row.id, "Not Found", 0.0)
-        return {"answer": "Not Found", "confidence": 0.0, "sources": []}
+        raise HTTPException(status_code=422, detail="No evidence found for query.")
 
     answer_payload = generate_answer(
         query=payload.query,
@@ -131,7 +155,7 @@ def query_document(
 
     if answer_payload["answer"] == "INSUFFICIENT_EVIDENCE":
         repository.create_answer(db, query_row.id, "Not Found", 0.0)
-        return {"answer": "Not Found", "confidence": 0.0, "sources": []}
+        raise HTTPException(status_code=424, detail="Answer could not be generated from evidence.")
 
     verification = verify_answer(
         answer_payload=answer_payload,
@@ -140,7 +164,7 @@ def query_document(
 
     if not verification["verified"]:
         repository.create_answer(db, query_row.id, "Not Found", 0.0)
-        return {"answer": "Not Found", "confidence": 0.0, "sources": []}
+        raise HTTPException(status_code=409, detail="Answer failed evidence verification.")
 
     confidence = score_confidence(
         retrieval_metrics=retrieval_metrics,
@@ -157,3 +181,28 @@ def query_document(
     repository.create_answer(db, query_row.id, response["answer"], response["confidence"])
 
     return response
+
+
+@router.get("/documents/{document_id}/debug")
+def debug_document_retrieval(
+    document_id: int,
+    query: str,
+    db: Session = Depends(get_db)
+):
+    document = repository.get_document_by_id(db, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="Query must not be empty.")
+
+    query_analysis = query_analyzer.analyze_query(query)
+    route = route_query(query_analysis)
+
+    return debug_retrieval(
+        document_id=document_id,
+        query=query,
+        query_type=query_analysis.get("query_type", "unknown"),
+        bm25_k=route["bm25_k"],
+        faiss_k=route["faiss_k"],
+        db=db,
+    )

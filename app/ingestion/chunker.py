@@ -1,7 +1,10 @@
 import re
 import uuid
+import logging
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class Tokenizer(ABC):
@@ -23,14 +26,14 @@ class Chunker:
     def __init__(
         self,
         tokenizer: Tokenizer = None,
-        target_tokens: int = 400,
-        max_tokens: int = 600,
-        overlap_sentences: int = 2,
+        target_tokens: int = 200,
+        max_tokens: int = 300,
+        overlap_tokens: int = 50,
     ):
         self.tokenizer = tokenizer or TiktokenTokenizer()
         self.target_tokens = target_tokens
         self.max_tokens = max_tokens
-        self.overlap_sentences = overlap_sentences
+        self.overlap_tokens = overlap_tokens
 
     def _split_sentences(self, text: str) -> List[str]:
         if not text:
@@ -62,8 +65,8 @@ class Chunker:
         return parts
 
     def _clamp_overlap(self, sentences: List[str]) -> List[str]:
-        overlap = sentences[-self.overlap_sentences :] if sentences else []
-        while overlap and sum(self.tokenizer.count_tokens(s) for s in overlap) > self.target_tokens:
+        overlap = sentences[:] if sentences else []
+        while overlap and sum(self.tokenizer.count_tokens(s) for s in overlap) > self.overlap_tokens:
             overlap = overlap[1:]
         return overlap
 
@@ -119,6 +122,14 @@ class Chunker:
             if "page_number" not in p:
                 continue
             out.extend(self.chunk_page(p["page_number"], p.get("text", "")))
+
+        chunk_sizes = [self.tokenizer.count_tokens(chunk["text"]) for chunk in out]
+        average_size = round(sum(chunk_sizes) / len(chunk_sizes), 2) if chunk_sizes else 0.0
+        logger.debug(
+            "Chunking summary: total_chunks=%s average_chunk_size=%s",
+            len(out),
+            average_size,
+        )
         return out
 
 

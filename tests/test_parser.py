@@ -1,11 +1,17 @@
+import fitz
 from app.ingestion.parser import parse_document
 
-pdf_path = "data/uploads/RS_Exp1_Rushikesh Bathe.pdf"
 
-pages = parse_document(pdf_path)
+def test_parse_document_reads_pdf(tmp_path):
+    pdf_path = tmp_path / "sample.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Hello from test PDF")
+    doc.save(pdf_path)
+    doc.close()
 
-print(type(pages))
-print(len(pages))
-print(pages[0].keys())
-print(pages[0]["page_number"])
-print(pages[0]["text"][:500])
+    pages = parse_document(str(pdf_path))
+
+    assert len(pages) == 1
+    assert pages[0]["page_number"] == 1
+    assert "Hello from test PDF" in pages[0]["text"]
